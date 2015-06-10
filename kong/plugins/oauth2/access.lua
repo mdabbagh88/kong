@@ -5,56 +5,13 @@ local responses = require "kong.tools.responses"
 
 local _M = {}
 
-
-local GET = "GET"
 local POST = "POST"
 local AUTHORIZE_URL = "/oauth2/authorize"
-
-local function generate_authorize_html(conf, client, scopes)
-
-
-  local application_owner = "thefosk"
-
-  return [[
-<html>
-<head>
-<title>Authorize ]]..client.name..[[</title>
-</head>
-<style>
-  @import url(http://fonts.googleapis.com/css?family=Open+Sans);
-  @media(max-width: 980px) {
-    html {
-      .graphic-text {
-          font-size: 15px;
-      }
-    }
-  }
-  body {
-    font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', 'Arial', 'Sans-Serif';
-    font-size: 14px;
-  }
-</style>
-<body>
-<h1>Authorize Application</h1>
-<p>Test by <b>]]..application_owner..[[</b> would like permissions to access your account</p>
-<hr>
-<h3>Review permissions</h3>
-
-<form action="]]..AUTHORIZE_URL..[[" method="POST">
-  <ul>
-    <li>user:email</li>
-  </ul>
-  <input type="submit" value="Authorize application">
-</form>
-</body>
-</html>
-  ]]
-end
 
 local function generate_token(state)
   local token = dao.oauth2_tokens:insert()
   return {
-    access_token = token.access_token
+    access_token = token.access_token,
     token_type = "bearer",
     expires_in = token.expires_in,
     refresh_token = token.refresh_token,
@@ -77,7 +34,7 @@ local function get_redirect_uri(client_id)
   return client and client.redirect_uri or nil, client
 end
 
-local function authorize(conf, show_html)
+local function authorize(conf)
   local response_params = {}
 
   local querystring = request.get_uri_args()
@@ -92,14 +49,10 @@ local function authorize(conf, show_html)
 
       if redirect_uri then
         if response_type == "code" then
-          if show_html then
-            responses.send_HTTP_OK(generate_authorize_html(conf, client, scope), true)
-          else
-            local authorization_code = dao.oauth2_authorization_codes:insert()
-            response_params = {
-              code = authorization_code.id
-            }
-          end
+          local authorization_code = dao.oauth2_authorization_codes:insert()
+          response_params = {
+            code = authorization_code.id
+          }
         elseif response_type == "token" then
           response_params = generate_token(state)
         end
@@ -140,12 +93,13 @@ end
 
 function _M.execute(conf)
   local method = ngx.get_method()
-  if (method == GET or method == POST) and stringy.endswith(ngx.var.request_uri, AUTHORIZE_URL) then
-    authorize(conf, method == POST)
-  elseif method == POST and stringy.endswith(ngx.var.request_uri, "/oauth2/token") then
-    retrieve_token()
+  if method == POST then
+    if stringy.endswith(ngx.var.request_uri, AUTHORIZE_URL) then
+       authorize(conf)
+    elseif stringy.endswith(ngx.var.request_uri, "/oauth2/token") then
+      retrieve_token()
+    end
   end
-
 end
 
 return _M

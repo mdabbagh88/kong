@@ -1,12 +1,10 @@
 local IO = require "kong.tools.io"
-local uuid = require "uuid"
+local utils = require "kong.tools.utils"
 local cjson = require "cjson"
 local stringy = require "stringy"
 local spec_helper = require "spec.spec_helpers"
 local http_client = require "kong.tools.http_client"
 
--- This is important to seed the UUID generator
-uuid.seed()
 
 local STUB_GET_URL = spec_helper.STUB_GET_URL
 
@@ -97,7 +95,7 @@ describe("Logging Plugins", function()
   it("should log to file", function()
     os.remove(FILE_LOG_PATH)
 
-    local uuid = string.gsub(uuid(), "-", "")
+    local uuid = utils.uuid(true)
 
     -- Making the request
     local _, status = http_client.get(STUB_GET_URL, nil,

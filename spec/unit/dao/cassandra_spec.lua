@@ -6,7 +6,6 @@ local constants = require "kong.constants"
 local DaoError = require "kong.dao.error"
 local utils = require "kong.tools.utils"
 local cjson = require "cjson"
-local uuid = require "uuid"
 
 -- Raw session for double-check purposes
 local session
@@ -222,7 +221,7 @@ describe("Cassandra DAO", function()
 
           -- With an invalid api_id, it's an FOREIGN error
           local plugin_t = faker:fake_entity("plugin_configuration")
-          plugin_t.api_id = uuid()
+          plugin_t.api_id = utils.uuid()
 
           local plugin, err = dao_factory.plugins_configurations:insert(plugin_t)
           assert.falsy(plugin)
@@ -233,8 +232,8 @@ describe("Cassandra DAO", function()
 
           -- With invalid api_id and consumer_id, it's an EXISTS error
           local plugin_t = faker:fake_entity("plugin_configuration")
-          plugin_t.api_id = uuid()
-          plugin_t.consumer_id = uuid()
+          plugin_t.api_id = utils.uuid()
+          plugin_t.consumer_id = utils.uuid()
 
           local plugin, err = dao_factory.plugins_configurations:insert(plugin_t)
           assert.falsy(plugin)
@@ -352,7 +351,7 @@ describe("Cassandra DAO", function()
 
         it("should return nil if no entity was found to update in DB", function()
           local t = faker:fake_entity(type)
-          t.id = uuid()
+          t.id = utils.uuid()
 
           -- Remove immutable fields
           for k,v in pairs(dao_factory[collection]._schema) do
@@ -481,7 +480,7 @@ describe("Cassandra DAO", function()
       describe_core_collections(function(type, collection)
 
         it("should return false if there was nothing to delete", function()
-          local ok, err = dao_factory[collection]:delete(uuid())
+          local ok, err = dao_factory[collection]:delete(utils.uuid())
           assert.is_not_true(ok)
           assert.falsy(err)
         end)
@@ -914,7 +913,7 @@ describe("Cassandra DAO", function()
       assert.are.same("consumer_id is required", err.message.consumer_id)
 
       -- With an invalid consumer_id, it's a FOREIGN error
-      local app_t = { key = "apikey123", consumer_id = uuid() }
+      local app_t = { key = "apikey123", consumer_id = utils.uuid() }
       local app, err = dao_factory.keyauth_credentials:insert(app_t)
       assert.falsy(app)
       assert.truthy(err)
@@ -959,8 +958,8 @@ describe("Cassandra DAO", function()
 
   describe("Rate Limiting Metrics", function()
     local ratelimiting_metrics = dao_factory.ratelimiting_metrics
-    local api_id = uuid()
-    local identifier = uuid()
+    local api_id = utils.uuid()
+    local identifier = utils.uuid()
 
     after_each(function()
       spec_helper.drop_db()

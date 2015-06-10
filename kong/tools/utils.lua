@@ -1,5 +1,24 @@
+local uuid = require "uuid"
+
+-- This is important to seed the UUID generator
+uuid.seed()
+
 local _M = {}
 
+-- Generates a random unique string
+-- @param `no_hypens` (Optional) optionally remove hypens from the output
+-- @return `string`   The random string
+function _M.uuid(no_hypens)
+  local res = uuid()
+  if no_hypens then
+    res = res:gsub("-", "")
+  end
+  return res
+end
+
+-- Calculates a table size
+-- @param `t`       The table to use
+-- @return `number` The size
 function _M.table_size(t)
   local res = 0
   for _ in pairs(t) do
@@ -8,6 +27,10 @@ function _M.table_size(t)
   return res
 end
 
+-- Checks if a value exists in a table
+-- @param `arr`      The table to use
+-- @param `val`      The value to check
+-- @return `boolean` Returns true if the table contains the value
 function _M.table_contains(arr, val)
   for _, v in pairs(arr) do
     if v == val then
@@ -17,6 +40,9 @@ function _M.table_contains(arr, val)
   return false
 end
 
+-- Checks if a table is an array and not an associative array
+-- @param `t`        The table to use
+-- @return `boolean` Returns true if the table is an array
 function _M.is_array(t)
   local i = 0
   for _ in pairs(t) do
@@ -26,6 +52,9 @@ function _M.is_array(t)
   return true
 end
 
+-- Checks if a table is an array and not an associative array
+-- @param `orig`     The table to copy
+-- @return `table`   Returns a copy of the input table
 function _M.deep_copy(orig)
   local copy
   if type(orig) == "table" then
@@ -39,6 +68,7 @@ function _M.deep_copy(orig)
   end
   return copy
 end
+
 
 -- Add an error message to a key/value table.
 -- Can accept a nil argument, and if is nil, will initialize the table.

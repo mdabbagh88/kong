@@ -1,4 +1,4 @@
-local uuid = require "uuid"
+local utils = require "kong.tools.utils"
 local Faker = require "kong.tools.faker"
 local DaoError = require "kong.dao.error"
 
@@ -12,7 +12,7 @@ describe("Faker", function()
 
   before_each(function()
     insert_spy = spy.new(function(self, t)
-                          t.id = uuid()
+                          t.id = utils.uuid()
                           return t
                         end)
 

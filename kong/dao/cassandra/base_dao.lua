@@ -14,15 +14,11 @@ local DaoError = require "kong.dao.error"
 local stringy = require "stringy"
 local Object = require "classic"
 local utils = require "kong.tools.utils"
-local uuid = require "uuid"
 
 local cassandra_constants = require "cassandra.constants"
 local error_types = constants.DATABASE_ERROR_TYPES
 
 local BaseDao = Object:extend()
-
--- This is important to seed the UUID generator
-uuid.seed()
 
 function BaseDao:new(properties)
   self._properties = properties
@@ -439,7 +435,7 @@ function BaseDao:insert(t)
 
   -- Override created_at and id by default value
   t.created_at = timestamp.get_utc()
-  t.id = uuid()
+  t.id = utils.uuid()
 
   -- Validate schema
   ok, errors = validate(t, self._schema)
