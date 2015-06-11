@@ -7,6 +7,7 @@ local PluginsConfigurations = BaseDao:extend()
 
 function PluginsConfigurations:new(properties)
   self._entity = "Plugin configuration"
+  self._table = "plugins_configurations"
   self._schema = plugins_configurations_schema
   self._queries = {
     insert = {
@@ -21,13 +22,13 @@ function PluginsConfigurations:new(properties)
     select = {
       query = [[ SELECT * FROM plugins_configurations %s; ]]
     },
-    select_one = {
-      args_keys = { "id" },
-      query = [[ SELECT * FROM plugins_configurations WHERE id = ?; ]]
-    },
     delete = {
       args_keys = { "id" },
       query = [[ DELETE FROM plugins_configurations WHERE id = ?; ]]
+    },
+    select_one = {
+      args_keys = { "id" },
+      query = [[ SELECT * FROM plugins_configurations WHERE id = ?; ]]
     },
     __unique = {
       self = {
@@ -72,6 +73,11 @@ function PluginsConfigurations:_unmarshall(t)
   end
 
   return t
+end
+
+-- @override
+function PluginsConfigurations:delete(plugin)
+  return PluginsConfigurations.super.delete(self, {id = plugin.id})
 end
 
 function PluginsConfigurations:find_distinct()

@@ -328,7 +328,7 @@ describe("Cassandra DAO", function()
           assert.falsy(err)
           assert.truthy(plugin)
 
-          local ok, err = dao_factory.plugins_configurations:delete(plugin.id)
+          local ok, err = dao_factory.plugins_configurations:delete({id = plugin.id})
           assert.True(ok)
           assert.falsy(err)
 
@@ -481,7 +481,7 @@ describe("Cassandra DAO", function()
       describe_core_collections(function(type, collection)
 
         it("should return false if there was nothing to delete", function()
-          local ok, err = dao_factory[collection]:delete(uuid())
+          local ok, err = dao_factory[collection]:delete({id = uuid()})
           assert.is_not_true(ok)
           assert.falsy(err)
         end)
@@ -492,7 +492,7 @@ describe("Cassandra DAO", function()
           assert.truthy(entities)
           assert.True(#entities > 0)
 
-          local ok, err = dao_factory[collection]:delete(entities[1].id)
+          local ok, err = dao_factory[collection]:delete({id = entities[1].id})
           assert.falsy(err)
           assert.True(ok)
 
@@ -561,7 +561,7 @@ describe("Cassandra DAO", function()
         end)
 
         it("should delete all related plugins_configurations when deleting an API", function()
-          local ok, err = dao_factory.apis:delete(api.id)
+          local ok, err = dao_factory.apis:delete(api)
           assert.falsy(err)
           assert.True(ok)
 
@@ -643,7 +643,7 @@ describe("Cassandra DAO", function()
         end)
 
         it("should delete all related plugins_configurations when deleting an API", function()
-          local ok, err = dao_factory.consumers:delete(consumer.id)
+          local ok, err = dao_factory.consumers:delete(consumer)
           assert.True(ok)
           assert.falsy(err)
 

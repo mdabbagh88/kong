@@ -5,6 +5,7 @@ local Consumers = BaseDao:extend()
 
 function Consumers:new(properties)
   self._entity = "Consumer"
+  self._table = "consumers"
   self._schema = consumers_schema
   self._queries = {
     insert = {
@@ -43,8 +44,8 @@ function Consumers:new(properties)
 end
 
 -- @override
-function Consumers:delete(consumer_id)
-  local ok, err = Consumers.super.delete(self, consumer_id)
+function Consumers:delete(consumer)
+  local ok, err = Consumers.super.delete(self, {id = consumer.id})
   if not ok then
     return false, err
   end
@@ -52,19 +53,19 @@ function Consumers:delete(consumer_id)
   -- delete all related plugins configurations
   local plugins_dao = self._factory.plugins_configurations
   local query, args_keys, errors = plugins_dao:_build_where_query(plugins_dao._queries.select.query, {
-    consumer_id = consumer_id
+    consumer_id = consumer.id
   })
   if errors then
     return nil, errors
   end
 
-  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {consumer_id=consumer_id}, {auto_paging=true}) do
+  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {consumer_id=consumer.id}, {auto_paging=true}) do
     if err then
       return nil, err
     end
 
     for _, row in ipairs(rows) do
-      local ok_del_plugin, err = plugins_dao:delete(row.id)
+      local ok_del_plugin, err = plugins_dao:delete({id = row.id})
       if not ok_del_plugin then
         return nil, err
       end

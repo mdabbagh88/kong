@@ -54,46 +54,47 @@ local function delete_fragment(column_family)
   return string.format("DELETE FROM %s", column_family)
 end
 
-local function where_fragment(where_values)
-  if not where_values then return "" end
-  local where_parts = {}
+local function where_fragment(where_t)
+  if not where_t then
+    return ""
+  else
+    assert(type(where_t) == "table", "where_t must be a table")
+  end
 
-  for k in pairs(where_values) do
-    table.insert(where_parts, string.format("%s = ?", k))
+  local where_parts, columns = {}, {}
+  for column in pairs(where_t) do
+    table.insert(where_parts, string.format("%s = ?", column))
+    table.insert(columns, column)
   end
 
   where_parts = table.concat(where_parts, " AND ")
 
-  return string.format("WHERE %s", where_parts)
+  return string.format("WHERE %s", where_parts), columns
 end
 
---
---
---
-
-function _M.select(column_family, where_values, select_columns)
+function _M.select(column_family, where_t, select_columns)
   local select_str = select_fragment(column_family, select_columns)
-  local where_str = where_fragment(where_values)
+  local where_str, columns = where_fragment(where_t)
 
-  return trim(string.format("%s %s", select_str, where_str))
+  return trim(string.format("%s %s", select_str, where_str)), columns
 end
 
 function _M.insert(column_family, insert_values)
   return insert_fragment(column_family, insert_values)
 end
 
-function _M.update(column_family, update_values, where_values)
+function _M.update(column_family, update_values, where_t)
   local update_str = update_fragment(column_family, update_values)
-  local where_str = where_fragment(where_values)
+  local where_str = where_fragment(where_t)
 
   return trim(string.format("%s %s", update_str, where_str))
 end
 
-function _M.delete(column_family, where_values)
+function _M.delete(column_family, where_t)
   local delete_str = delete_fragment(column_family)
-  local where_str = where_fragment(where_values)
+  local where_str, columns = where_fragment(where_t)
 
-  return trim(string.format("%s %s", delete_str, where_str))
+  return trim(string.format("%s %s", delete_str, where_str)), columns
 end
 
 return _M

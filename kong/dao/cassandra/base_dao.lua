@@ -5,6 +5,7 @@
 -- this object to benefit from methods such as `insert`, `update`, schema validations
 -- (including UNIQUE and FOREIGN check), marshalling of some properties, etc...
 
+local query_builder = require "kong.dao.cassandra.query_builder"
 local validations = require("kong.dao.schemas_validation")
 local validate = validations.validate
 local constants = require "kong.constants"
@@ -531,29 +532,13 @@ function BaseDao:update(t)
   end
 end
 
-local function check_args(args, args_keys)
-  local keys = {}
-  for _, k in ipairs(args_keys) do
-    keys[k] = true
-    if not args[k] then
-      error("Missing key: "..k)
-    end
-  end
-
-  for k, v in pairs(args) do
-    if not keys[k] then
-      error("Unknown key: "..k)
-    end
-  end
-end
-
 -- Execute the SELECT_ONE kong_query of a DAO entity.
 -- @param  `args_keys` Keys to bind to the `select_one` query.
 -- @return `result`    The first row of the _execute_kong_query() return value
-function BaseDao:find_one(args)
-  check_args(args, self._queries.select_one.args_keys)
+function BaseDao:find_one(where_values)
+  local select_q, where_columns = query_builder.select(self._table, where_values)
 
-  local data, err = self:_execute_kong_query(self._queries.select_one, args)
+  local data, err = self:_execute_kong_query({ query = select_q, args_keys = where_columns }, where_values)
 
   -- Return the 1st and only element of the result set
   if data and utils.table_size(data) > 0 then
@@ -595,15 +580,19 @@ end
 -- @param `id`       uuid of the entity to delete
 -- @return `success` True if deleted, false if otherwise or not found
 -- @return `error`   Error if any during the query execution
-function BaseDao:delete(id)
-  local exists, err = self:_check_foreign(self._queries.select_one, { id = id })
+function BaseDao:delete(t)
+  local select_q, where_columns = query_builder.select(self._table, t)
+
+  local exists, err = self:_check_foreign({ query = select_q, args_keys = where_columns }, t)
   if err then
     return false, err
   elseif not exists then
     return false
   end
 
-  return self:_execute_kong_query(self._queries.delete, { id = id })
+  local delete_q, where_columns = query_builder.delete(self._table, t)
+
+  return self:_execute_kong_query({ query = delete_q, args_keys = where_columns }, t)
 end
 
 function BaseDao:drop()

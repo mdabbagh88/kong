@@ -18,6 +18,11 @@ describe("Query Builder", function()
       assert.equal("SELECT name, id FROM apis WHERE name = ? AND public_dns = ?", q)
     end)
 
+    it("should return the columns of the arguments to bind", function()
+      local _, columns = builder.select("apis", {name="mockbin", public_dns="mockbin.com"}, {"name", "id"})
+      assert.same({"name", "public_dns"}, columns)
+    end)
+
     it("should throw an error if no column_family", function()
       assert.has_error(function()
         builder.select()
@@ -86,9 +91,14 @@ describe("Query Builder", function()
       assert.equal("DELETE FROM apis", q)
     end)
 
-    it("should build w WHERE fragment", function()
+    it("should build a WHERE fragment", function()
       local q = builder.delete("apis", {name="mockbin"})
       assert.equal("DELETE FROM apis WHERE name = ?", q)
+    end)
+
+    it("should return the columns of the arguments to bind", function()
+      local _, columns = builder.delete("apis", {name="mockbin"})
+      assert.same({"name"}, columns)
     end)
 
     it("should throw an error if no column_family", function()

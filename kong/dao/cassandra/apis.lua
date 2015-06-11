@@ -5,6 +5,7 @@ local Apis = BaseDao:extend()
 
 function Apis:new(properties)
   self._entity = "API"
+  self._table = "apis"
   self._schema = apis_schema
   self._queries = {
     insert = {
@@ -63,8 +64,8 @@ function Apis:find_all()
 end
 
 -- @override
-function Apis:delete(api_id)
-  local ok, err = Apis.super.delete(self, api_id)
+function Apis:delete(api)
+  local ok, err = Apis.super.delete(self, {id = api.id})
   if not ok then
     return false, err
   end
@@ -72,19 +73,19 @@ function Apis:delete(api_id)
   -- delete all related plugins configurations
   local plugins_dao = self._factory.plugins_configurations
   local query, args_keys, errors = plugins_dao:_build_where_query(plugins_dao._queries.select.query, {
-    api_id = api_id
+    api_id = api.id
   })
   if errors then
     return nil, errors
   end
 
-  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {api_id=api_id}, {auto_paging=true}) do
+  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {api_id=api.id}, {auto_paging=true}) do
     if err then
       return nil, err
     end
 
     for _, row in ipairs(rows) do
-      local ok_del_plugin, err = plugins_dao:delete(row.id)
+      local ok_del_plugin, err = plugins_dao:delete({id = row.id})
       if not ok_del_plugin then
         return nil, err
       end
