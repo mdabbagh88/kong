@@ -1,4 +1,13 @@
+local utils = require "kong.tools.utils"
+local stringy = require "stringy"
 local BaseDao = require "kong.dao.cassandra.base_dao"
+
+local function generate_if_missing(v, t, column)
+  if not v or stirngy.strip(v) == "" then
+    return true, nil, { column = utils.uuid(true)}
+  end
+  return true
+end
 
 local OAuth2Credentials = BaseDao:extend()
 
@@ -7,8 +16,8 @@ function OAuth2Credentials:new(properties)
     id = { type = "id" },
     consumer_id = { type = "id", required = true, foreign = true, queryable = true },
     name = { type = "string", required = true, queryable = true },
-    client_id = { type = "string", required = true, unique = true, queryable = true },
-    client_secret = { type = "string", required = true, unique = true, queryable = true },
+    client_id = { type = "string", required = true, unique = true, queryable = true, func = generate_if_missing },
+    client_secret = { type = "string", required = true, unique = true, queryable = true, func = generate_if_missing },
     created_at = { type = "timestamp" }
   }
 
@@ -42,9 +51,13 @@ function OAuth2Credentials:new(properties)
       }
     },
     __unique = {
-      key = {
-        args_keys = { "key" },
-        query = [[ SELECT id FROM oauth2_credentials WHERE key = ?; ]]
+      client_id = {
+        args_keys = { "client_id" },
+        query = [[ SELECT id FROM oauth2_credentials WHERE client_id = ?; ]]
+      },
+      client_secret = {
+        args_keys = { "client_id" },
+        query = [[ SELECT id FROM oauth2_credentials WHERE client_secret = ?; ]]
       }
     },
     drop = "TRUNCATE oauth2_credentials;"

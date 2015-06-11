@@ -151,7 +151,7 @@ function _M.validate(t, schema, is_update)
 
     -- [FUNC] Check field against a custom function only if there is no error on that field already
     if v.func and type(v.func) == "function" and (errors == nil or errors[column] == nil) then
-      local ok, err, new_fields = v.func(t[column], t)
+      local ok, err, new_fields = v.func(t[column], t, column)
       if not ok and err then
         errors = utils.add_error(errors, column, err)
       elseif new_fields then

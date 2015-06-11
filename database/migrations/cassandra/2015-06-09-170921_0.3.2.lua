@@ -5,6 +5,7 @@ local Migration = {
     return [[
       CREATE TABLE IF NOT EXISTS oauth2_credentials(
         id uuid,
+        name text,
         consumer_id uuid,
         client_id text,
         client_secret text,
