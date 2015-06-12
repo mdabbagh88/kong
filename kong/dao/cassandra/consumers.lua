@@ -1,4 +1,5 @@
 local BaseDao = require "kong.dao.cassandra.base_dao"
+local query_builder = require "kong.dao.cassandra.query_builder"
 local consumers_schema = require "kong.dao.schemas.consumers"
 
 local Consumers = BaseDao:extend()
@@ -9,9 +10,6 @@ function Consumers:new(properties)
   self._schema = consumers_schema
   self._primary_key = {"id"}
   self._queries = {
-    select = {
-      query = [[ SELECT * FROM consumers %s; ]]
-    },
     __unique = {
       self = {
         args_keys = { "id" },
@@ -39,16 +37,11 @@ function Consumers:delete(where_t)
     return false, err
   end
 
-  -- delete all related plugins configurations
   local plugins_dao = self._factory.plugins_configurations
-  local query, args_keys, errors = plugins_dao:_build_where_query(plugins_dao._queries.select.query, {
-    consumer_id = where_t.id
-  })
-  if errors then
-    return nil, errors
-  end
+  local select_q, columns = query_builder.select(plugins_dao._table, {consumer_id = where_t.id}, self._primary_key)
 
-  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {consumer_id=where_t.id}, {auto_paging=true}) do
+  -- delete all related plugins configurations
+  for _, rows, page, err in plugins_dao:_execute_kong_query({query = select_q, args_keys = columns}, {consumer_id=where_t.id}, {auto_paging=true}) do
     if err then
       return nil, err
     end

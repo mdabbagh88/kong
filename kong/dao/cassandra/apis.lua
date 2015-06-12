@@ -1,5 +1,6 @@
 local BaseDao = require "kong.dao.cassandra.base_dao"
 local apis_schema = require "kong.dao.schemas.apis"
+local query_builder = require "kong.dao.cassandra.query_builder"
 
 local Apis = BaseDao:extend()
 
@@ -9,9 +10,6 @@ function Apis:new(properties)
   self._schema = apis_schema
   self._primary_key = {"id"}
   self._queries = {
-    select = {
-      query = [[ SELECT * FROM apis %s; ]]
-    },
     __unique = {
       self = {
         args_keys = { "id" },
@@ -38,7 +36,8 @@ end
 
 function Apis:find_all()
   local apis = {}
-  for _, rows, page, err in Apis.super._execute_kong_query(self, self._queries.select.query, nil, {auto_paging=true}) do
+  local select_q = query_builder.select(self._table)
+  for _, rows, page, err in Apis.super._execute_kong_query(self, {query = select_q}, nil, {auto_paging=true}) do
     if err then
       return nil, err
     end
@@ -60,14 +59,9 @@ function Apis:delete(where_t)
 
   -- delete all related plugins configurations
   local plugins_dao = self._factory.plugins_configurations
-  local query, args_keys, errors = plugins_dao:_build_where_query(plugins_dao._queries.select.query, {
-    api_id = where_t.id
-  })
-  if errors then
-    return nil, errors
-  end
+  local select_q, columns = query_builder.select(plugins_dao._table, {api_id = where_t.id}, self._primary_key)
 
-  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {api_id=where_t.id}, {auto_paging=true}) do
+  for _, rows, page, err in plugins_dao:_execute_kong_query({query = select_q, args_keys = columns}, {api_id=where_t.id}, {auto_paging=true}) do
     if err then
       return nil, err
     end

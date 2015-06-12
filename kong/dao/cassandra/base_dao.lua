@@ -25,14 +25,6 @@ local BaseDao = Object:extend()
 -- This is important to seed the UUID generator
 uuid.seed()
 
-function BaseDao:extract_primary_keys(t)
-  local t2 = {}
-  for _, v in ipairs(self._primary_key) do
-    t2[v] = t[v]
-  end
-  return t2
-end
-
 function BaseDao:new(properties)
   self._properties = properties
   self._statements_cache = {}
@@ -225,33 +217,6 @@ local function encode_cassandra_args(schema, t, args_keys)
   end
 
   return args_to_bind, errors
-end
-
-function BaseDao:_build_where_query(query, t)
-  local args_keys = {}
-  local where_str = ""
-  local errors
-
-  -- if t is an args_keys, compute a WHERE statement
-  if t and utils.table_size(t) > 0 then
-    local where = {}
-    for k, v in pairs(t) do
-      if self._schema[k] and self._schema[k].queryable or k == "id" then
-        table.insert(where, string.format("%s = ?", k))
-        table.insert(args_keys, k)
-      else
-        errors = utils.add_error(errors, k, k.." is not queryable.")
-      end
-    end
-
-    if errors then
-      return nil, nil, DaoError(errors, error_types.SCHEMA)
-    end
-
-    where_str = "WHERE "..table.concat(where, " AND ").." ALLOW FILTERING"
-  end
-
-  return string.format(query, where_str), args_keys
 end
 
 -- Get a statement from the cache or prepare it (and thus insert it in the cache).
@@ -494,12 +459,19 @@ function BaseDao:update(t)
     return nil, DaoError("Cannot update a nil element", error_types.SCHEMA)
   end
 
-  local t_primary_keys = self:extract_primary_keys(t)
-  local unique_q, unique_q_columns = query_builder.select(self._table, t_primary_keys)
+  -- Extract primary keys from the entity
+  local t_without_primary_keys = utils.deep_copy(t)
+  local t_only_primary_keys = {}
+  for _, v in ipairs(self._primary_key) do
+    t_only_primary_keys[v] = t[v]
+    t_without_primary_keys[v] = nil
+  end
+
+  local unique_q, unique_q_columns = query_builder.select(self._table, t_only_primary_keys)
 
   -- Check if exists to prevent upsert and manually set UNSET values (pfffff...)
   local results
-  ok, err, results = self:_check_foreign({query = unique_q, args_keys = unique_q_columns}, t_primary_keys)
+  ok, err, results = self:_check_foreign({query = unique_q, args_keys = unique_q_columns}, t_only_primary_keys)
   if err then
     return nil, err
   elseif not ok then
@@ -537,17 +509,7 @@ function BaseDao:update(t)
     return nil, DaoError(errors, error_types.FOREIGN)
   end
 
-  local tmp = {}
-  for _, v in ipairs(self._primary_key) do
-    tmp[v] = t[v]
-    t[v] = nil
-  end
-
-  local update_q, columns = query_builder.update(self._table, t, t_primary_keys, self._primary_key)
-
-  for _, v in ipairs(self._primary_key) do
-    t[v] = tmp[v]
-  end
+  local update_q, columns = query_builder.update(self._table, t_without_primary_keys, t_only_primary_keys, self._primary_key)
 
   local _, stmt_err = self:_execute_kong_query({query = update_q, args_keys = columns}, self:_marshall(t))
   if stmt_err then

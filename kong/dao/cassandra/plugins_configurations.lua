@@ -1,4 +1,5 @@
 local plugins_configurations_schema = require "kong.dao.schemas.plugins_configurations"
+local query_builder = require "kong.dao.cassandra.query_builder"
 local constants = require "kong.constants"
 local BaseDao = require "kong.dao.cassandra.base_dao"
 local cjson = require "cjson"
@@ -11,9 +12,6 @@ function PluginsConfigurations:new(properties)
   self._schema = plugins_configurations_schema
   self._primary_key = {"id", "name"}
   self._queries = {
-    select = {
-      query = [[ SELECT * FROM plugins_configurations %s; ]]
-    },
     __unique = {
       self = {
         args_keys = { "api_id", "consumer_id", "name" },
@@ -71,9 +69,11 @@ function PluginsConfigurations:find_distinct()
     return nil, err
   end
 
+  local select_q = query_builder.select(self._table)
+
   -- Execute query
   local distinct_names = {}
-  for _, rows, page, err in session:execute(string.format(self._queries.select.query, ""), nil, {auto_paging=true}) do
+  for _, rows, page, err in PluginsConfigurations.super._execute_kong_query(self, {query = select_q}, nil, {auto_paging=true}) do
     if err then
       return nil, err
     end
