@@ -9,26 +9,10 @@ function PluginsConfigurations:new(properties)
   self._entity = "Plugin configuration"
   self._table = "plugins_configurations"
   self._schema = plugins_configurations_schema
+  self._primary_key = {"id", "name"}
   self._queries = {
-    insert = {
-      args_keys = { "id", "api_id", "consumer_id", "name", "value", "enabled", "created_at" },
-      query = [[ INSERT INTO plugins_configurations(id, api_id, consumer_id, name, value, enabled, created_at)
-                  VALUES(?, ?, ?, ?, ?, ?, ?); ]]
-    },
-    update = {
-      args_keys = { "api_id", "consumer_id", "value", "enabled", "created_at", "id", "name" },
-      query = [[ UPDATE plugins_configurations SET api_id = ?, consumer_id = ?, value = ?, enabled = ?, created_at = ? WHERE id = ? AND name = ?; ]]
-    },
     select = {
       query = [[ SELECT * FROM plugins_configurations %s; ]]
-    },
-    delete = {
-      args_keys = { "id" },
-      query = [[ DELETE FROM plugins_configurations WHERE id = ?; ]]
-    },
-    select_one = {
-      args_keys = { "id" },
-      query = [[ SELECT * FROM plugins_configurations WHERE id = ?; ]]
     },
     __unique = {
       self = {
@@ -76,8 +60,8 @@ function PluginsConfigurations:_unmarshall(t)
 end
 
 -- @override
-function PluginsConfigurations:delete(plugin)
-  return PluginsConfigurations.super.delete(self, {id = plugin.id})
+function PluginsConfigurations:delete(where_t)
+  return PluginsConfigurations.super.delete(self, {id = where_t.id})
 end
 
 function PluginsConfigurations:find_distinct()

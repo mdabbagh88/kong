@@ -7,28 +7,16 @@ function Apis:new(properties)
   self._entity = "API"
   self._table = "apis"
   self._schema = apis_schema
+  self._primary_key = {"id"}
   self._queries = {
-    insert = {
-      args_keys = { "id", "name", "public_dns", "path", "strip_path", "target_url", "created_at" },
-      query = [[ INSERT INTO apis(id, name, public_dns, path, strip_path, target_url, created_at)
-                  VALUES(?, ?, ?, ?, ?, ?, ?); ]]
-    },
-    update = {
-      args_keys = { "name", "public_dns", "path", "strip_path", "target_url", "id" },
-      query = [[ UPDATE apis SET name = ?, public_dns = ?, path = ?, strip_path = ?, target_url = ? WHERE id = ?; ]]
-    },
     select = {
       query = [[ SELECT * FROM apis %s; ]]
     },
-    select_one = {
-      args_keys = { "id" },
-      query = [[ SELECT * FROM apis WHERE id = ?; ]]
-    },
-    delete = {
-      args_keys = { "id" },
-      query = [[ DELETE FROM apis WHERE id = ?; ]]
-    },
     __unique = {
+      self = {
+        args_keys = { "id" },
+        query = [[ SELECT * FROM apis WHERE id = ?; ]]
+      },
       name = {
         args_keys = { "name" },
         query = [[ SELECT id FROM apis WHERE name = ?; ]]
@@ -64,8 +52,8 @@ function Apis:find_all()
 end
 
 -- @override
-function Apis:delete(api)
-  local ok, err = Apis.super.delete(self, {id = api.id})
+function Apis:delete(where_t)
+  local ok, err = Apis.super.delete(self, {id = where_t.id})
   if not ok then
     return false, err
   end
@@ -73,13 +61,13 @@ function Apis:delete(api)
   -- delete all related plugins configurations
   local plugins_dao = self._factory.plugins_configurations
   local query, args_keys, errors = plugins_dao:_build_where_query(plugins_dao._queries.select.query, {
-    api_id = api.id
+    api_id = where_t.id
   })
   if errors then
     return nil, errors
   end
 
-  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {api_id=api.id}, {auto_paging=true}) do
+  for _, rows, page, err in plugins_dao:_execute_kong_query({query=query, args_keys=args_keys}, {api_id=where_t.id}, {auto_paging=true}) do
     if err then
       return nil, err
     end

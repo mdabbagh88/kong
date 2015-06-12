@@ -6,7 +6,7 @@
 -- (including UNIQUE and FOREIGN check), marshalling of some properties, etc...
 
 local query_builder = require "kong.dao.cassandra.query_builder"
-local validations = require("kong.dao.schemas_validation")
+local validations = require "kong.dao.schemas_validation"
 local validate = validations.validate
 local constants = require "kong.constants"
 local cassandra = require "cassandra"
@@ -24,6 +24,14 @@ local BaseDao = Object:extend()
 
 -- This is important to seed the UUID generator
 uuid.seed()
+
+function BaseDao:extract_primary_keys(t)
+  local t2 = {}
+  for _, v in ipairs(self._primary_key) do
+    t2[v] = t[v]
+  end
+  return t2
+end
 
 function BaseDao:new(properties)
   self._properties = properties
@@ -465,7 +473,9 @@ function BaseDao:insert(t)
     return nil, DaoError(errors, error_types.FOREIGN)
   end
 
-  local _, stmt_err = self:_execute_kong_query(self._queries.insert, self:_marshall(t))
+  local insert_q, columns = query_builder.insert(self._table, t)
+
+  local _, stmt_err = self:_execute_kong_query({ query = insert_q, args_keys = columns }, self:_marshall(t))
   if stmt_err then
     return nil, stmt_err
   else
@@ -484,9 +494,12 @@ function BaseDao:update(t)
     return nil, DaoError("Cannot update a nil element", error_types.SCHEMA)
   end
 
+  local t_primary_keys = self:extract_primary_keys(t)
+  local unique_q, unique_q_columns = query_builder.select(self._table, t_primary_keys)
+
   -- Check if exists to prevent upsert and manually set UNSET values (pfffff...)
   local results
-  ok, err, results = self:_check_foreign(self._queries.select_one, t)
+  ok, err, results = self:_check_foreign({query = unique_q, args_keys = unique_q_columns}, t_primary_keys)
   if err then
     return nil, err
   elseif not ok then
@@ -524,7 +537,19 @@ function BaseDao:update(t)
     return nil, DaoError(errors, error_types.FOREIGN)
   end
 
-  local _, stmt_err = self:_execute_kong_query(self._queries.update, self:_marshall(t))
+  local tmp = {}
+  for _, v in ipairs(self._primary_key) do
+    tmp[v] = t[v]
+    t[v] = nil
+  end
+
+  local update_q, columns = query_builder.update(self._table, t, t_primary_keys, self._primary_key)
+
+  for _, v in ipairs(self._primary_key) do
+    t[v] = tmp[v]
+  end
+
+  local _, stmt_err = self:_execute_kong_query({query = update_q, args_keys = columns}, self:_marshall(t))
   if stmt_err then
     return nil, stmt_err
   else
@@ -535,10 +560,10 @@ end
 -- Execute the SELECT_ONE kong_query of a DAO entity.
 -- @param  `args_keys` Keys to bind to the `select_one` query.
 -- @return `result`    The first row of the _execute_kong_query() return value
-function BaseDao:find_one(where_values)
-  local select_q, where_columns = query_builder.select(self._table, where_values)
+function BaseDao:find_one(where_t)
+  local select_q, where_columns = query_builder.select(self._table, where_t)
 
-  local data, err = self:_execute_kong_query({ query = select_q, args_keys = where_columns }, where_values)
+  local data, err = self:_execute_kong_query({ query = select_q, args_keys = where_columns }, where_t)
 
   -- Return the 1st and only element of the result set
   if data and utils.table_size(data) > 0 then
@@ -556,13 +581,15 @@ end
 -- @param `page_size`    Size of the page to retrieve (number of rows).
 -- @param `paging_state` Start page from given offset. See lua-resty-cassandra's :execute() option.
 -- @return _execute_kong_query()
-function BaseDao:find_by_keys(t, page_size, paging_state)
-  local select_where_query, args_keys, errors = self:_build_where_query(self._queries.select.query, t)
+function BaseDao:find_by_keys(where_t, page_size, paging_state)
+  --[[local select_where_query, args_keys, errors = self:_build_where_query(self._queries.select.query, where_t)
   if errors then
     return nil, errors
-  end
+  end]]
 
-  return self:_execute_kong_query({ query = select_where_query, args_keys = args_keys }, t, {
+  local select_q, where_columns = query_builder.select(self._table, where_t, self._primary_key)
+
+  return self:_execute_kong_query({ query = select_q, args_keys = where_columns }, where_t, {
     page_size = page_size,
     paging_state = paging_state
   })
@@ -580,19 +607,19 @@ end
 -- @param `id`       uuid of the entity to delete
 -- @return `success` True if deleted, false if otherwise or not found
 -- @return `error`   Error if any during the query execution
-function BaseDao:delete(t)
-  local select_q, where_columns = query_builder.select(self._table, t)
+function BaseDao:delete(where_t)
+  local select_q, where_columns = query_builder.select(self._table, where_t, self._primary_key)
 
-  local exists, err = self:_check_foreign({ query = select_q, args_keys = where_columns }, t)
+  local exists, err = self:_check_foreign({ query = select_q, args_keys = where_columns }, where_t)
   if err then
     return false, err
   elseif not exists then
     return false
   end
 
-  local delete_q, where_columns = query_builder.delete(self._table, t)
+  local delete_q, where_columns = query_builder.delete(self._table, where_t, self._primary_key)
 
-  return self:_execute_kong_query({ query = delete_q, args_keys = where_columns }, t)
+  return self:_execute_kong_query({ query = delete_q, args_keys = where_columns }, where_t)
 end
 
 function BaseDao:drop()
