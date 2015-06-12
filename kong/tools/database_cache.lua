@@ -7,6 +7,7 @@ local CACHE_KEYS = {
   BASICAUTH_CREDENTIAL = "basicauth_credentials",
   KEYAUTH_CREDENTIAL = "keyauth_credentials",
   OAUTH2_CREDENTIAL = "oauth2_credentials",
+  OAUTH2_TOKEN = "oauth2_token",
   SSL = "ssl",
   REQUESTS = "requests"
 }
@@ -79,6 +80,10 @@ end
 
 function _M.oauth2_credential_key(client_id)
   return CACHE_KEYS.OAUTH2_CREDENTIAL.."/"..client_id
+end
+
+function _M.oauth2_token_key(access_token)
+  return CACHE_KEYS.OAUTH2_TOKEN.."/"..access_token
 end
 
 function _M.keyauth_credential_key(key)

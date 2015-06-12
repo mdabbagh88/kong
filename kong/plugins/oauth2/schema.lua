@@ -2,8 +2,8 @@ local utils = require "kong.tools.utils"
 local stringy = require "stringy"
 
 local function generate_if_missing(v, t, column)
-  if not v or stirngy.strip(v) == "" then
-    return true, nil, { column = utils.uuid(true)}
+  if not v or stringy.strip(v) == "" then
+    return true, nil, { [column] = utils.uuid(true)}
   end
   return true
 end
@@ -16,7 +16,7 @@ local function check_mandatory_scope(v, t)
 end
 
 return {
-  scopes = { required = true, type = "array" },
+  scopes = { required = false, type = "array" },
   mandatory_scope = { required = true, type = "boolean", default = false, func = check_mandatory_scope },
-  provision_key = { required = true, unique = true, type = "string", func = generate_if_missing }
+  provision_key = { required = false, unique = true, type = "string", func = generate_if_missing }
 }

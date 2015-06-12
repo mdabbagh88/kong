@@ -2,7 +2,7 @@ local json = require "cjson"
 local http_client = require "kong.tools.http_client"
 local spec_helper = require "spec.spec_helpers"
 
-describe("Key Auth Credentials API", function()
+describe("OAuth 2 Credentials API", function()
   local BASE_URL, credential, consumer
 
   setup(function()
@@ -14,33 +14,33 @@ describe("Key Auth Credentials API", function()
     spec_helper.stop_kong()
   end)
 
-  describe("/consumers/:consumer/keyauth/", function()
+  describe("/consumers/:consumer/oauth2/", function()
 
     setup(function()
       local fixtures = spec_helper.insert_fixtures {
         consumer = {{ username = "bob" }}
       }
       consumer = fixtures.consumer[1]
-      BASE_URL = spec_helper.API_URL.."/consumers/bob/keyauth/"
+      BASE_URL = spec_helper.API_URL.."/consumers/bob/oauth2/"
     end)
 
     describe("POST", function()
 
-      it("[SUCCESS] should create a keyauth credential", function()
-        local response, status = http_client.post(BASE_URL, { key = "1234" })
+      it("[SUCCESS] should create a oauth2 credential", function()
+        local response, status = http_client.post(BASE_URL, { })
         assert.equal(201, status)
         credential = json.decode(response)
         assert.equal(consumer.id, credential.consumer_id)
       end)
 
       it("[FAILURE] should return proper errors", function()
-        local response, status = http_client.post(BASE_URL, {})
+        local response, status = http_client.post(BASE_URL, { mandatory_scope = true })
         assert.equal(400, status)
         assert.equal('{"key":"key is required"}\n', response)
       end)
 
     end)
-
+    --[[
     describe("PUT", function()
       setup(function()
         spec_helper.get_env().dao_factory.keyauth_credentials:delete(credential.id)
@@ -60,7 +60,7 @@ describe("Key Auth Credentials API", function()
       end)
 
     end)
-
+    
     describe("GET", function()
 
       it("should retrieve all", function()
@@ -117,5 +117,6 @@ describe("Key Auth Credentials API", function()
       end)
 
     end)
+    --]]
   end)
 end)

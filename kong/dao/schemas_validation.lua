@@ -9,12 +9,17 @@ local POSSIBLE_TYPES = {
   string = true,
   number = true,
   boolean = true,
+  url = true,
   timestamp = true
 }
 
 local types_validation = {
   [constants.DATABASE_TYPES.ID] = function(v) return type(v) == "string" end,
   [constants.DATABASE_TYPES.TIMESTAMP] = function(v) return type(v) == "number" end,
+  ["url"] = function(v) 
+    local parsed_url = require("socket.url").parse(v)
+    return parsed_url and parsed_url.path and parsed_url.host and parsed_url.scheme
+  end,
   ["array"] = function(v) return utils.is_array(v) end
 }
 

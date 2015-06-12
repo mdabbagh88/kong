@@ -27,6 +27,17 @@ function _M.table_size(t)
   return res
 end
 
+-- Merges two table together
+-- @param `t1`      The first table
+-- @param `t2`      The second table
+-- @return `table`  The final table
+function _M.table_merge(t1, t2)
+  local res = {}
+  for k,v in pairs(t1) do res[k] = v end
+  for k,v in pairs(t2) do res[k] = v end
+  return res
+end
+
 -- Checks if a value exists in a table
 -- @param `arr`      The table to use
 -- @param `val`      The value to check
