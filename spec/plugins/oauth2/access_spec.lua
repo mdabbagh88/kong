@@ -11,8 +11,20 @@ local dao_factory = env.dao_factory
 local configuration = env.configuration
 configuration.cassandra = configuration.databases_available[configuration.database].properties
 
-
 local PROXY_URL = spec_helper.PROXY_URL
+
+local function provision_code()
+  local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "code", state = "hello", authenticated_username = "user123", authenticated_userid = "userid123" }, {host = "oauth2.com"})
+  local body = cjson.decode(response)
+  local matches = rex.gmatch(body.redirect_uri, "^http://google\\.com/kong\\?code=([\\w]{32,32})&state=hello$")
+  local code 
+  for line in matches do 
+    code = line
+    break
+  end
+  local data = dao_factory.oauth2_authorization_codes:find_by_keys({code = code})
+  return data[1].code
+end
 
 describe("Authentication Plugin", function()
 
@@ -29,7 +41,7 @@ describe("Authentication Plugin", function()
         { name = "oauth2", value = { scopes = { "email", "profile" }, mandatory_scope = true, provision_key = "provision123" }, __api = 1 }
       },
       oauth2_credential = {
-        { client_id = "clientid123", client_secret = "clientsecret123", redirect_uri = "http://google.com/kong", name="testapp", __consumer = 1 }
+        { client_id = "clientid123", client_secret = "secret123", redirect_uri = "http://google.com/kong", name="testapp", __consumer = 1 }
       }
     }
 
@@ -45,12 +57,16 @@ describe("Authentication Plugin", function()
     describe("Code Grant", function()
 
       it("should return an error when no provision_key is being sent", function()
-        local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { }, {host = "oauth2.com"})
+        local response, status, headers = http_client.post(PROXY_URL.."/oauth2/authorize", { }, {host = "oauth2.com"})
         local body = cjson.decode(response)
         assert.are.equal(400, status)
         assert.are.equal(2, utils.table_size(body))
         assert.are.equal("invalid_provision_key", body.error)
         assert.are.equal("Invalid Kong provision_key", body.error_description)
+
+        -- Checking headers
+        assert.are.equal("no-store", headers["cache-control"])
+        assert.are.equal("no-cache", headers["pragma"])
       end)
 
       it("should return an error when no parameter is being sent", function()
@@ -94,6 +110,14 @@ describe("Authentication Plugin", function()
         assert.are.equal("http://google.com/kong?error=unsupported_response_type&state=somestate&error_description=Invalid%20response_type", body.redirect_uri)
       end)
 
+      it("should return error when the redirect_uri does not match", function()
+        local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "code", redirect_uri = "http://hello.com/" }, {host = "oauth2.com"})
+        local body = cjson.decode(response)
+        assert.are.equal(400, status)
+        assert.are.equal(1, utils.table_size(body))
+        assert.are.equal("http://google.com/kong?error=invalid_request&error_description=Invalid%20redirect_uri%20that%20does%20not%20match%20with%20the%20one%20created%20with%20the%20application", body.redirect_uri)
+      end)
+
       it("should return success", function()
         local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "code" }, {host = "oauth2.com"})
         local body = cjson.decode(response)
@@ -102,12 +126,24 @@ describe("Authentication Plugin", function()
         assert.truthy(rex.match(body.redirect_uri, "^http://google\\.com/kong\\?code=[\\w]{32,32}$"))
       end)
 
+      it("should return success when requesting the url with final slash", function()
+        local response, status = http_client.post(PROXY_URL.."/oauth2/authorize/", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "code" }, {host = "oauth2.com"})
+        local body = cjson.decode(response)
+        assert.are.equal(200, status)
+        assert.are.equal(1, utils.table_size(body))
+        assert.truthy(rex.match(body.redirect_uri, "^http://google\\.com/kong\\?code=[\\w]{32,32}$"))
+      end)
+
       it("should return success with a state", function()
-        local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "code", state = "hello" }, {host = "oauth2.com"})
+        local response, status, headers = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "code", state = "hello" }, {host = "oauth2.com"})
         local body = cjson.decode(response)
         assert.are.equal(200, status)
         assert.are.equal(1, utils.table_size(body))
         assert.truthy(rex.match(body.redirect_uri, "^http://google\\.com/kong\\?code=[\\w]{32,32}&state=hello$"))
+
+        -- Checking headers
+        assert.are.equal("no-store", headers["cache-control"])
+        assert.are.equal("no-cache", headers["pragma"])
       end)
 
       it("should return success and store authenticated user properties", function()
@@ -129,16 +165,21 @@ describe("Authentication Plugin", function()
 
         assert.are.equal("user123", data[1].authenticated_username)
         assert.are.equal("userid123", data[1].authenticated_userid)
+        assert.are.equal("email", data[1].scope)
       end)
     end)
   
     describe("Implicit Grant", function()
       it("should return success", function()
-        local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "token" }, {host = "oauth2.com"})
+        local response, status, headers = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "token" }, {host = "oauth2.com"})
         local body = cjson.decode(response)
         assert.are.equal(200, status)
         assert.are.equal(1, utils.table_size(body))
         assert.truthy(rex.match(body.redirect_uri, "^http://google\\.com/kong\\?refresh_token=[\\w]{32,32}&token_type=bearer&access_token=[\\w]{32,32}$"))
+
+        -- Checking headers
+        assert.are.equal("no-store", headers["cache-control"])
+        assert.are.equal("no-cache", headers["pragma"])
       end)
 
       it("should return success and the state", function()
@@ -150,7 +191,7 @@ describe("Authentication Plugin", function()
       end)
 
       it("should return success and store authenticated user properties", function()
-        local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "token", authenticated_username = "user123", authenticated_userid = "userid123" }, {host = "oauth2.com"})
+        local response, status = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email  profile", response_type = "token", authenticated_username = "user123", authenticated_userid = "userid123" }, {host = "oauth2.com"})
         local body = cjson.decode(response)
         assert.are.equal(200, status)
         assert.are.equal(1, utils.table_size(body))
@@ -158,7 +199,7 @@ describe("Authentication Plugin", function()
 
         local matches = rex.gmatch(body.redirect_uri, "^http://google\\.com/kong\\?refresh_token=[\\w]{32,32}&token_type=bearer&access_token=([\\w]{32,32})$")
         local access_token 
-        for line in matches do 
+        for line in matches do
           access_token = line
           break
         end
@@ -168,10 +209,84 @@ describe("Authentication Plugin", function()
 
         assert.are.equal("user123", data[1].authenticated_username)
         assert.are.equal("userid123", data[1].authenticated_userid)
+        assert.are.equal("email profile", data[1].scope)
       end)
     end)
-  
-
   end)
 
+  describe("OAuth2 Access Token", function()
+
+    it("should return an error when nothing is being sent", function()
+      local response, status, headers = http_client.post(PROXY_URL.."/oauth2/token", { }, {host = "oauth2.com"})
+      local body = cjson.decode(response)
+      assert.are.equal(400, status)
+      assert.are.equal(2, utils.table_size(body))
+      assert.are.equal("invalid_request", body.error)
+      assert.are.equal("Invalid code", body.error_description)
+
+      -- Checking headers
+      assert.are.equal("no-store", headers["cache-control"])
+      assert.are.equal("no-cache", headers["pragma"])
+    end)
+
+    it("should return an error when only the code is being sent", function()
+      local code = provision_code()
+
+      local response, status, headers = http_client.post(PROXY_URL.."/oauth2/token", { code = code }, {host = "oauth2.com"})
+      local body = cjson.decode(response)
+      assert.are.equal(400, status)
+      assert.are.equal(2, utils.table_size(body))
+      assert.are.equal("invalid_request", body.error)
+      assert.are.equal("Invalid client_secret", body.error_description)
+
+      -- Checking headers
+      assert.are.equal("no-store", headers["cache-control"])
+      assert.are.equal("no-cache", headers["pragma"])
+    end)
+
+    it("should return an error when only the code and client_secret are being sent", function()
+      local code = provision_code()
+
+      local response, status, headers = http_client.post(PROXY_URL.."/oauth2/token", { code = code, client_secret = "secret123" }, {host = "oauth2.com"})
+      local body = cjson.decode(response)
+      assert.are.equal(400, status)
+      assert.are.equal(2, utils.table_size(body))
+      assert.are.equal("invalid_request", body.error)
+      assert.are.equal("Invalid client_id", body.error_description)
+
+      -- Checking headers
+      assert.are.equal("no-store", headers["cache-control"])
+      assert.are.equal("no-cache", headers["pragma"])
+    end)
+
+    it("should return an error when only the code and client_secret and client_id are being sent", function()
+      local code = provision_code()
+
+      local response, status, headers = http_client.post(PROXY_URL.."/oauth2/token", { code = code, client_id = "clientid123", client_secret = "secret123" }, {host = "oauth2.com"})
+      local body = cjson.decode(response)
+      assert.are.equal(400, status)
+      assert.are.equal(1, utils.table_size(body))
+      assert.are.equal("http://google.com/kong?error=invalid_request&error_description=Invalid%20grant_type", body.redirect_uri)
+    end)
+
+    it("should return success without state", function()
+      local code = provision_code()
+
+      local response, status, headers = http_client.post(PROXY_URL.."/oauth2/token", { code = code, client_id = "clientid123", client_secret = "secret123", grant_type = "authorization_code" }, {host = "oauth2.com"})
+      local body = cjson.decode(response)
+        assert.are.equal(200, status)
+        assert.are.equal(1, utils.table_size(body))
+        assert.truthy(rex.match(body.redirect_uri, "^http://google\\.com/kong\\?refresh_token=[\\w]{32,32}&token_type=bearer&access_token=[\\w]{32,32}$"))
+    end)
+
+    it("should return success with state", function()
+      local code = provision_code()
+
+      local response, status, headers = http_client.post(PROXY_URL.."/oauth2/token", { code = code, client_id = "clientid123", client_secret = "secret123", grant_type = "authorization_code", state = "wot" }, {host = "oauth2.com"})
+      local body = cjson.decode(response)
+        assert.are.equal(200, status)
+        assert.are.equal(1, utils.table_size(body))
+        assert.truthy(rex.match(body.redirect_uri, "^http://google\\.com/kong\\?refresh_token=[\\w]{32,32}&token_type=bearer&state=wot&access_token=[\\w]{32,32}$"))
+    end)
+  end)
 end)

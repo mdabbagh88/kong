@@ -5,13 +5,15 @@ local responses = require "kong.tools.responses"
 
 local _M = {}
 
-
 local RESPONSE_TYPE = "response_type"
 local STATE = "state"
 local CODE = "code"
 local TOKEN = "token"
 local SCOPE = "scope"
 local CLIENT_ID = "client_id"
+local CLIENT_SECRET = "client_secret"
+local REDIRECT_URI = "redirect_uri"
+local GRANT_TYPE = "grant_type"
 local ERROR = "error"
 local AUTHENTICATED_USERNAME = "authenticated_username"
 local AUTHENTICATED_USERID = "authenticated_userid"
@@ -20,11 +22,12 @@ local AUTHORIZE_URL = "^/oauth2/authorize/?$"
 local TOKEN_URL = "^/oauth2/token/?$"
 
 -- TODO: Expire token (using TTL ?)
-local function generate_token(credential, authenticated_username, authenticated_userid, state)
+local function generate_token(credential, authenticated_username, authenticated_userid, scope, state)
   local token, err = dao.oauth2_tokens:insert({
     credential_id = credential.id,
     authenticated_username = authenticated_username,
-    authenticated_userid = authenticated_userid
+    authenticated_userid = authenticated_userid,
+    scope = scope
   })
   return {
     access_token = token.access_token,
@@ -52,12 +55,16 @@ local function get_redirect_uri(client_id)
   return client and client.redirect_uri or nil, client
 end
 
+local function retrieve_parameters()
+  ngx.req.read_body()
+  -- OAuth2 parameters could be in both the querystring or body
+  return utils.table_merge(ngx.req.get_uri_args(), ngx.req.get_post_args())
+end
+
 local function authorize(conf)
   local response_params = {}
 
-  ngx.req.read_body()
-  -- OAuth2 parameters could be in both the querystring or body
-  local parameters = utils.table_merge(ngx.req.get_uri_args(), ngx.req.get_post_args())
+  local parameters = retrieve_parameters()
 
   local redirect_uri, client
   local state = parameters[STATE]
@@ -73,12 +80,14 @@ local function authorize(conf)
 
     -- Check scopes
     local scope = parameters[SCOPE]
+    local scopes = {}
     if conf.scopes and scope then
-      local scopes = stringy.split(scope, " ")
-      for _, v in ipairs(scopes) do
-        if not utils.table_contains(conf.scopes, scope) then
-          response_params = {[ERROR] = "invalid_scope", error_description = "\""..scope.."\" is an invalid "..SCOPE}
+      for v in scope:gmatch("%w+") do
+        if not utils.table_contains(conf.scopes, v) then
+          response_params = {[ERROR] = "invalid_scope", error_description = "\""..v.."\" is an invalid "..SCOPE}
           break
+        else
+          table.insert(scopes, v)
         end
       end
     elseif not scope and conf.mandatory_scope then
@@ -89,6 +98,8 @@ local function authorize(conf)
     redirect_uri, client = get_redirect_uri(parameters[CLIENT_ID])
     if not redirect_uri then
       response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..CLIENT_ID}
+    elseif parameters[REDIRECT_URI] and parameters[REDIRECT_URI] ~= redirect_uri then
+      response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..REDIRECT_URI.." that does not match with the one created with the application"}
     end
 
     -- If there are no errors, keep processing the request
@@ -96,14 +107,15 @@ local function authorize(conf)
       if response_type == CODE then
         local authorization_code, err = dao.oauth2_authorization_codes:insert({
           authenticated_username = parameters[AUTHENTICATED_USERNAME],
-          authenticated_userid = parameters[AUTHENTICATED_USERID]
+          authenticated_userid = parameters[AUTHENTICATED_USERID],
+          scope = table.concat(scopes, " ")
         })
 
         response_params = {
           code = authorization_code.code,
         }
       else
-        response_params = generate_token(client, parameters[AUTHENTICATED_USERNAME], parameters[AUTHENTICATED_USERID], state)
+        response_params = generate_token(client, parameters[AUTHENTICATED_USERNAME], parameters[AUTHENTICATED_USERID],  table.concat(scopes, " "), state)
       end
     end
   end
@@ -114,43 +126,74 @@ local function authorize(conf)
   -- Sending response in JSON format
   responses.send(response_params[ERROR] and 400 or 200, redirect_uri and {
     redirect_uri = redirect_uri.."?"..ngx.encode_args(response_params)
-  } or response_params)
+  } or response_params, false, {
+    ["cache-control"] = "no-store",
+    ["pragma"] = "no-cache"
+  })
 end
 
---[[
 local function retrieve_token()
-  ngx.req.read_body()
-  local args = ngx.req.get_post_args()
-  
-  local grant_type = args["grant_type"]
-  if grant_type == "authorization_code" then
-    local code = args["code"]
+  local response_params = {}
 
-    local redirect_uri = get_redirect_uri(querystring["client_id"])
-    if redirect_uri then
-      local authorization_code = dao.oauth2_authorization_codes:find_one(code)
-
-      if authorization_code then
-        responses.send_HTTP_OK(generate_token())
-      end
-
-    end
-
+  local parameters = retrieve_parameters() --TODO: Also from authorization header
+  local state = parameters[STATE]
+    
+  local grant_type = parameters[GRANT_TYPE]
+  if grant_type ~= "authorization_code" then
+    response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..GRANT_TYPE}
   end
+
+  -- Check client_id and redirect_uri
+  local redirect_uri, client = get_redirect_uri(parameters[CLIENT_ID])
+  if not redirect_uri then
+    response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..CLIENT_ID}
+  elseif parameters[REDIRECT_URI] and parameters[REDIRECT_URI] ~= redirect_uri then
+    response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..REDIRECT_URI.." that does not match with the one created with the application"}
+  end
+
+  local inspect = require "inspect"
+  print(inspect(client))
+
+  local client_secret = parameters[CLIENT_SECRET]
+  if not client_secret or (client and client_secret ~= client.client_secret) then
+    response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..CLIENT_SECRET}
+  end
+
+  local code = parameters[CODE]
+  local authorization_code = code and dao.oauth2_authorization_codes:find_by_keys({code = code}) or nil
+  if not authorization_code then
+    response_params = {[ERROR] = "invalid_request", error_description = "Invalid "..CODE}
+  end
+
+  -- If there are no errors, keep processing the request
+  if not response_params[ERROR] then
+    response_params = generate_token(client, authorization_code.authenticated_username, authorization_code.authenticated_userid, authorization_code.scopes, state)
+  end
+
+  -- Adding the state if it exists. If the state == nil then it won't be added
+  response_params.state = state
+
+  -- Sending response in JSON format
+  responses.send(response_params[ERROR] and 400 or 200, redirect_uri and {
+    redirect_uri = redirect_uri.."?"..ngx.encode_args(response_params)
+  } or response_params, false, {
+    ["cache-control"] = "no-store",
+    ["pragma"] = "no-cache"
+  })
 end
---]]
 
 function _M.execute(conf)
   if ngx.req.get_method() == "POST" then
+    --TODO: strip path resolver from ngx.var.request_uri
     if ngx.re.match(ngx.var.request_uri, AUTHORIZE_URL) then
       authorize(conf)
     elseif ngx.re.match(ngx.var.request_uri, TOKEN_URL) then
-      --retrieve_token()
+      retrieve_token()
     end
   end
 
-  local access_token = ngx.req.get_uri_args()["access_token"]
 
+  local access_token = ngx.req.get_uri_args()["access_token"]
   local token
   if access_token then
     token = cache.get_or_set(cache.oauth2_token_key(access_token), function()

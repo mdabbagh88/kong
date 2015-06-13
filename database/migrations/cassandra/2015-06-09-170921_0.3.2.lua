@@ -22,6 +22,7 @@ local Migration = {
         code text,
         authenticated_username text,
         authenticated_userid text,
+        scope text,
         created_at timestamp,
         PRIMARY KEY (id)
       ) WITH default_time_to_live = 300;
@@ -37,6 +38,7 @@ local Migration = {
         expires_in int,
         authenticated_username text,
         authenticated_userid text,
+        scope text,
         created_at timestamp,
         PRIMARY KEY (id)
       );

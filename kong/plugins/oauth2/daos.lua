@@ -73,15 +73,16 @@ function OAuth2AuthorizationCodes:new(properties)
     code = { type = "string", required = false, unique = true, queryable = true, immutable = true, func = generate_if_missing },
     authenticated_username = { type = "string", required = false },
     authenticated_userid = { type = "string", required = false },
+    scope = { type = "string" },
     created_at = { type = "timestamp" }
   }
 
   self._queries = {
     insert = {
-      args_keys = { "id", "code", "authenticated_username", "authenticated_userid", "created_at" },
+      args_keys = { "id", "code", "authenticated_username", "authenticated_userid", "scope", "created_at" },
       query = [[
-        INSERT INTO oauth2_authorization_codes(id, code, authenticated_username, authenticated_userid, created_at)
-          VALUES(?, ?, ?, ?, ?);
+        INSERT INTO oauth2_authorization_codes(id, code, authenticated_username, authenticated_userid, scope, created_at)
+          VALUES(?, ?, ?, ?, ?, ?);
       ]]
     },
     update = {
@@ -124,15 +125,16 @@ function OAuth2Tokens:new(properties)
     expires_in = { type = "number", require = true },
     authenticated_username = { type = "string", required = false },
     authenticated_userid = { type = "string", required = false },
+    scope = { type = "string" },
     created_at = { type = "timestamp" }
   }
 
   self._queries = {
     insert = {
-      args_keys = { "id", "credential_id", "token_type", "access_token", "refresh_token", "expires_in", "authenticated_username", "authenticated_userid", "created_at" },
+      args_keys = { "id", "credential_id", "token_type", "access_token", "refresh_token", "expires_in", "authenticated_username", "authenticated_userid", "scope", "created_at" },
       query = [[
-        INSERT INTO oauth2_tokens(id, credential_id, token_type, access_token, refresh_token, expires_in, authenticated_username, authenticated_userid, created_at)
-          VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO oauth2_tokens(id, credential_id, token_type, access_token, refresh_token, expires_in, authenticated_username, authenticated_userid, scope, created_at)
+          VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       ]]
     },
     update = { 
