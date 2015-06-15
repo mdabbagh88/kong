@@ -12,6 +12,7 @@ local KeyAuth = BaseDao:extend()
 function KeyAuth:new(properties)
   self._table = "keyauth_credentials"
   self._schema = SCHEMA
+  self._primary_key = {"id"}
   self._queries = {
     insert = {
       args_keys = { "id", "consumer_id", "key", "created_at" },

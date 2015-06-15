@@ -31,7 +31,7 @@ end
 
 -- @override
 function Consumers:delete(where_t)
-  local ok, err = Consumers.super.delete(self, {id = where_t.id})
+  local ok, err = Consumers.super.delete(self, where_t)
   if not ok then
     return false, err
   end

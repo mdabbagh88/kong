@@ -57,8 +57,11 @@ function PluginsConfigurations:_unmarshall(t)
 end
 
 -- @override
-function PluginsConfigurations:delete(where_t)
-  return PluginsConfigurations.super.delete(self, {id = where_t.id})
+function PluginsConfigurations:update(t)
+  if not t.consumer_id then
+    t.consumer_id = constants.DATABASE_NULL_ID
+  end
+  return PluginsConfigurations.super.update(self, t)
 end
 
 function PluginsConfigurations:find_distinct()

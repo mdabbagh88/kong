@@ -74,13 +74,17 @@ function _M.paginated_set(self, dao_collection)
 end
 
 function _M.put(params, dao_collection)
-  local new_entity, err
-  if params.id then
+  local res, new_entity, err
+
+  res, err = dao_collection:find_one(params)
+  if err then
+    return app_helpers.yield_error(err)
+  end
+
+  if res then
     new_entity, err = dao_collection:update(params)
-    if not err and new_entity then
+    if not err then
       return responses.send_HTTP_OK(new_entity)
-    elseif not new_entity then
-      return responses.send_HTTP_NOT_FOUND()
     end
   else
     new_entity, err = dao_collection:insert(params)
@@ -104,12 +108,16 @@ function _M.post(params, dao_collection, success)
   end
 end
 
-function _M.patch(params, dao_collection)
-  local new_entity, err = dao_collection:update(params)
+function _M.patch(new_entity, old_entity, dao_collection)
+  for k, v in pairs(new_entity) do
+    old_entity[k] = v
+  end
+
+  local updated_entity, err = dao_collection:update(old_entity)
   if err then
     return app_helpers.yield_error(err)
   else
-    return responses.send_HTTP_OK(new_entity)
+    return responses.send_HTTP_OK(updated_entity)
   end
 end
 

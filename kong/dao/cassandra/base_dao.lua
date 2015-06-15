@@ -119,18 +119,34 @@ end
 -- @return `error`      Error if any during the query  execution
 -- @return `errors`     A table with the list of already existing entities
 function BaseDao:_check_all_unique(t, is_updating)
-  if not self._queries.__unique then return true end
-
   local errors
-  for k, statement in pairs(self._queries.__unique) do
-    if t[k] or k == "self" then
-      local unique, err = self:_check_unique(statement, t, is_updating)
-      if err then
-        return false, err
-      elseif not unique and k == "self" then
-        return false, nil, self._entity.." already exists"
-      elseif not unique then
-        errors = utils.add_error(errors, k, k.." already exists with value '"..t[k].."'")
+
+  if not self._queries.__unique then
+    for k, v in pairs(self._schema) do
+      if v.unique and t[k] ~= nil then
+        local select_q, columns = query_builder.select(self._table, {[k] = t[k]})
+        local kong_stmt = {query = select_q, args_keys = columns}
+        local unique, err = self:_check_unique(kong_stmt, t, is_updating)
+        if err then
+          return false, err
+        --elseif not unique and k == "self" then
+          --return false, nil, self._entity.." already exists"
+        elseif not unique then
+          errors = utils.add_error(errors, k, k.." already exists with value '"..t[k].."'")
+        end
+      end
+    end
+  else
+    for k, statement in pairs(self._queries.__unique) do
+      if t[k] or k == "self" then
+        local unique, err = self:_check_unique(statement, t, is_updating)
+        if err then
+          return false, err
+        elseif not unique and k == "self" then
+          return false, nil, self._entity.." already exists"
+        elseif not unique then
+          errors = utils.add_error(errors, k, k.." already exists with value '"..t[k].."'")
+        end
       end
     end
   end
@@ -469,7 +485,7 @@ function BaseDao:update(t)
 
   local unique_q, unique_q_columns = query_builder.select(self._table, t_only_primary_keys)
 
-  -- Check if exists to prevent upsert and manually set UNSET values (pfffff...)
+  -- Check if exists to prevent upsert
   ok, err = self:_check_foreign({query = unique_q, args_keys = unique_q_columns}, t_only_primary_keys)
   if err then
     return nil, err
@@ -513,9 +529,18 @@ end
 -- @param  `args_keys` Keys to bind to the `select_one` query.
 -- @return `result`    The first row of the _execute_kong_query() return value
 function BaseDao:find_one(where_t)
-  local select_q, where_columns = query_builder.select(self._table, where_t)
+  local primary_keys = {}
+  for i, k in pairs(self._primary_key) do
+    if i == 1 and not where_t[k] then
+      return nil
+    else
+      primary_keys[k] = where_t[k]
+    end
+  end
 
-  local data, err = self:_execute_kong_query({ query = select_q, args_keys = where_columns }, where_t)
+  local select_q, where_columns = query_builder.select(self._table, primary_keys)
+
+  local data, err = self:_execute_kong_query({ query = select_q, args_keys = where_columns }, primary_keys)
 
   -- Return the 1st and only element of the result set
   if data and utils.table_size(data) > 0 then
@@ -555,6 +580,8 @@ end
 -- @return `success` True if deleted, false if otherwise or not found
 -- @return `error`   Error if any during the query execution
 function BaseDao:delete(where_t)
+  assert(type(where_t) == "table", ":delete() arg1 must be a table")
+
   local q, where_columns = query_builder.select(self._table, where_t, self._primary_key)
 
   local exists, err = self:_check_foreign({ query = q, args_keys = where_columns }, where_t)

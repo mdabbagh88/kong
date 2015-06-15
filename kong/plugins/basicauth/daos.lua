@@ -13,6 +13,7 @@ local BasicAuthCredentials = BaseDao:extend()
 function BasicAuthCredentials:new(properties)
   self._table = "basicauth_credentials"
   self._schema = SCHEMA
+  self._primary_key = {"id"}
   self._queries = {
     insert = {
       args_keys = { "id", "consumer_id", "username", "password", "created_at" },

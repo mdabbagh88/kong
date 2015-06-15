@@ -69,6 +69,7 @@ describe("Cassandra DAO", function()
     describe_core_collections(function(type, collection)
 
       it("should have statements for all unique and foreign schema fields", function()
+        pending()
         for column, schema_field in pairs(dao_factory[collection]._schema) do
           if schema_field.unique then
             assert.truthy(dao_factory[collection]._queries.__unique[column])
@@ -161,8 +162,8 @@ describe("Cassandra DAO", function()
         it("should not insert an invalid api", function()
           -- Nil
           local api, err = dao_factory.apis:insert()
-          assert.falsy(api)
           assert.truthy(err)
+          assert.falsy(api)
           assert.True(err.schema)
           assert.are.same("Cannot insert a nil element", err.message)
 
@@ -412,8 +413,8 @@ describe("Cassandra DAO", function()
           api_t.public_dns = apis[2].public_dns
 
           local api, err = dao_factory.apis:update(api_t)
-          assert.falsy(api)
           assert.truthy(err)
+          assert.falsy(api)
           assert.is_daoError(err)
           assert.True(err.unique)
           assert.are.same("public_dns already exists with value '"..api_t.public_dns.."'", err.message.public_dns)
@@ -561,7 +562,7 @@ describe("Cassandra DAO", function()
         end)
 
         it("should delete all related plugins_configurations when deleting an API", function()
-          local ok, err = dao_factory.apis:delete(api)
+          local ok, err = dao_factory.apis:delete({id = api.id})
           assert.falsy(err)
           assert.True(ok)
 
@@ -642,8 +643,8 @@ describe("Cassandra DAO", function()
           spec_helper.drop_db()
         end)
 
-        it("should delete all related plugins_configurations when deleting an API", function()
-          local ok, err = dao_factory.consumers:delete(consumer)
+        it("should delete all related plugins_configurations when deleting a Consumer", function()
+          local ok, err = dao_factory.consumers:delete({id = consumer.id})
           assert.True(ok)
           assert.falsy(err)
 
@@ -746,7 +747,7 @@ describe("Cassandra DAO", function()
 
           local plugin_t = plugins_configurations[1]
 
-          local result, err = dao_factory.plugins_configurations:find_one({ id = plugin_t.id })
+          local result, err = dao_factory.plugins_configurations:find_one({ id = plugin_t.id, name = plugin_t.name })
           assert.falsy(err)
           assert.truthy(result)
           assert.are.same("table", type(result.value))

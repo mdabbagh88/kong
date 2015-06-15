@@ -38,12 +38,11 @@ return {
     end,
 
     PATCH = function(self, dao_factory)
-      self.params.id = self.plugin_conf.id
-      crud.patch(self.params, dao_factory.plugins_configurations)
+      crud.patch(self.params, self.plugin_conf, dao_factory.plugins_configurations)
     end,
 
     DELETE = function(self, dao_factory)
-      crud.delete({id = self.plugin_conf}, dao_factory.plugins_configurations)
+      crud.delete({id = self.plugin_conf.id}, dao_factory.plugins_configurations)
     end
   }
 }
