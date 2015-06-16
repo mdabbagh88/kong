@@ -242,8 +242,6 @@ local function parse_access_token(conf)
         found_in.authorization_header = true
       end
     end
-  else
-
   end
 
   if conf.hide_credentials then
@@ -303,8 +301,6 @@ function _M.execute(conf)
     local result, err = dao.oauth2_credentials:find_one(token.credential_id)
     if err then
       return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
-    else
-      credential = result
     end
     return result
   end)

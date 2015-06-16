@@ -28,7 +28,7 @@ describe("Logging Plugins", function()
       plugin_configuration = {
         { name = "tcplog", value = { host = "127.0.0.1", port = TCP_PORT }, __api = 1 },
         { name = "udplog", value = { host = "127.0.0.1", port = UDP_PORT }, __api = 2 },
-        { name = "httplog", value = { http_endpoint = "http://localhost:"..HTTP_PORT }, __api = 3 },
+        { name = "httplog", value = { http_endpoint = "http://localhost:"..HTTP_PORT.."/" }, __api = 3 },
         { name = "filelog", value = { path = FILE_LOG_PATH }, __api = 4 }
       }
     }

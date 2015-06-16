@@ -176,7 +176,6 @@ describe("Authentication Plugin", function()
         local code 
         for line in matches do 
           code = line
-          break
         end
         local data = dao_factory.oauth2_authorization_codes:find_by_keys({code = code})
         assert.are.equal(1, #data)
@@ -346,19 +345,19 @@ describe("Authentication Plugin", function()
 
     it("should work when a correct access_token is being sent in the querystring", function()
       local token = provision_token()
-      local response, status = http_client.post(STUB_GET_URL, { access_token = token.access_token }, {host = "oauth2.com"})
+      local _, status = http_client.post(STUB_GET_URL, { access_token = token.access_token }, {host = "oauth2.com"})
       assert.are.equal(200, status)
     end)
 
     it("should work when a correct access_token is being sent in a form body", function()
       local token = provision_token()
-      local response, status = http_client.post(STUB_POST_URL, { access_token = token.access_token }, {host = "oauth2.com"})
+      local _, status = http_client.post(STUB_POST_URL, { access_token = token.access_token }, {host = "oauth2.com"})
       assert.are.equal(200, status)
     end)
 
     it("should work when a correct access_token is being sent in an authorization header (bearer)", function()
       local token = provision_token()
-      local response, status = http_client.post(STUB_POST_URL, { }, {host = "oauth2.com", authorization = "bearer "..token.access_token})
+      local _, status = http_client.post(STUB_POST_URL, { }, {host = "oauth2.com", authorization = "bearer "..token.access_token})
       assert.are.equal(200, status)
     end)
 
