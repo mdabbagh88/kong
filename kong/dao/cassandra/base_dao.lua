@@ -41,45 +41,6 @@ function BaseDao:_unmarshall(t)
   return t
 end
 
--- Run a statement checking if a row exists (true if it does).
--- @param `kong_query` kong_query to execute
--- @param `t`          args to bind to the statement
--- @return `exists`    true if the row exists (FOREIGN), false otherwise
--- @return `error`     Error if any during the query execution
-function BaseDao:_check_foreign(kong_query, t)
-  local results, err = self:_execute_kong_query(kong_query, t)
-  if err then
-    return false, err
-  elseif not results or #results == 0 then
-    return false
-  else
-    return true
-  end
-end
-
--- Run the FOREIGN exists check on all statements in __foreign.
--- @param  `t`      args to bind to the __foreign statements
--- @return `exists` if all results EXIST, false otherwise
--- @return `error`  Error if any during the query execution
--- @return `errors` A table with the list of not existing foreign entities
-function BaseDao:_check_all_foreign(t)
-  if not self._queries or not self._queries.__foreign then return true end
-
-  local errors
-  for k, kong_query in pairs(self._queries.__foreign) do
-    if t[k] and t[k] ~= constants.DATABASE_NULL_ID then
-      local exists, err = self:_check_foreign(kong_query, t)
-      if err then
-        return false, err
-      elseif not exists then
-        errors = utils.add_error(errors, k, k.." "..t[k].." does not exist")
-      end
-    end
-  end
-
-  return errors == nil, nil, errors
-end
-
 -- Open a Cassandra session on the configured keyspace.
 -- @param `keyspace` (Optional) Override the keyspace for this session if specified.
 -- @return `session` Opened session
@@ -400,16 +361,15 @@ function BaseDao:update(t)
   end
 
   -- Check if exists to prevent upsert
-  local exists_q, exists_q_columns = query_builder.select(self._table, t_only_primary_keys)
-  ok, err = self:_check_foreign({query = exists_q, args_keys = exists_q_columns}, t_only_primary_keys)
+  local res, err = self:find_by_keys(t_only_primary_keys)
   if err then
-    return nil, err
-  elseif not ok then
-    return nil
+    return false, err
+  elseif not res or #res == 0 then
+    return false
   end
 
   -- Validate schema
-  err = validations.validate(t, self, { is_update = next(t_without_primary_keys) ~= nil}) -- hack
+  err = validations.validate(t, self, { is_update = next(t_without_primary_keys) ~= nil, primary_key = t_only_primary_keys}) -- hack
   if err then
     return nil, err
   end
@@ -484,17 +444,15 @@ function BaseDao:delete(where_t)
   assert(where_t ~= nil, "where_t must not be nil")
 
   -- Test if exists first
-  local q, where_columns = query_builder.select(self._table, where_t, self._primary_key)
-  local exists, err = self:_check_foreign({ query = q, args_keys = where_columns }, where_t)
+  local res, err = self:find_by_keys(where_t)
   if err then
     return false, err
-  elseif not exists then
+  elseif not res or #res == 0 then
     return false
   end
 
-  q, where_columns = query_builder.delete(self._table, where_t, self._primary_key)
-
-  return self:_execute_kong_query({ query = q, args_keys = where_columns }, where_t)
+  local delete_q, where_columns = query_builder.delete(self._table, where_t, self._primary_key)
+  return self:_execute_kong_query({ query = delete_q, args_keys = where_columns }, where_t)
 end
 
 function BaseDao:drop()

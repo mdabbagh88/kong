@@ -199,7 +199,7 @@ function _M.on_insert(t, schema, dao)
   end
 end
 
-local function check_unique_fields(t, dao)
+local function check_unique_fields(t, dao, options)
   local errors
 
   for k, field in pairs(dao._schema.fields) do
@@ -208,7 +208,23 @@ local function check_unique_fields(t, dao)
       if err then
         return false, nil, "Error during UNIQUE check: "..err.message
       elseif res and #res > 0 then
-        errors = utils.add_error(errors, k, k.." already exists with value '"..t[k].."'")
+        local is_self = true
+        if options.is_update then
+          -- If update, check if the retrieved entity is not the entity itself
+          res = res[1]
+          for key_k, key_v in pairs(options.primary_key) do
+            if t[key_k] ~= key_v then
+              is_self = false
+              break
+            end
+          end
+        else
+          is_self = false
+        end
+
+        if not is_self then
+          errors = utils.add_error(errors, k, k.." already exists with value '"..t[k].."'")
+        end
       end
     end
   end
@@ -244,7 +260,7 @@ function _M.validate(t, dao, options)
     return DaoError(errors, error_types.SCHEMA)
   end
 
-  ok, errors, db_err = check_unique_fields(t, dao)
+  ok, errors, db_err = check_unique_fields(t, dao, options)
   if db_err then
     return DaoError(db_err, error_types.DATABASE)
   elseif not ok then
@@ -258,11 +274,6 @@ function _M.validate(t, dao, options)
     return DaoError(errors, error_types.FOREIGN)
   end
 end
-
-
-
-
-
 
 local digit = "[0-9a-f]"
 local uuid_pattern = "^"..table.concat({ digit:rep(8), digit:rep(4), digit:rep(4), digit:rep(4), digit:rep(12) }, '%-').."$"
