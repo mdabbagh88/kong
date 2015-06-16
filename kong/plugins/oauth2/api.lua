@@ -8,15 +8,15 @@ return {
     end,
 
     GET = function(self, dao_factory, helpers)
-      crud.paginated_set(self, dao_factory.keyauth_credentials)
+      crud.paginated_set(self, dao_factory.oauth2_credentials)
     end,
 
     PUT = function(self, dao_factory)
-      crud.put(self.params, dao_factory.keyauth_credentials)
+      crud.put(self.params, dao_factory.oauth2_credentials)
     end,
 
     POST = function(self, dao_factory)
-      crud.post(self.params, dao_factory.keyauth_credentials)
+      crud.post(self.params, dao_factory.oauth2_credentials)
     end
   },
 
@@ -25,7 +25,7 @@ return {
       crud.find_consumer_by_username_or_id(self, dao_factory, helpers)
       self.params.consumer_id = self.consumer.id
 
-      local data, err = dao_factory.keyauth_credentials:find_by_keys({ id = self.params.id })
+      local data, err = dao_factory.oauth2_credentials:find_by_keys({ id = self.params.id })
       if err then
         return helpers.yield_error(err)
       end
@@ -41,11 +41,11 @@ return {
     end,
 
     PATCH = function(self, dao_factory)
-      crud.patch(self.params, dao_factory.keyauth_credentials)
+      crud.patch(self.params, dao_factory.oauth2_credentials)
     end,
 
     DELETE = function(self, dao_factory)
-      crud.delete(self.plugin.id, dao_factory.keyauth_credentials)
+      crud.delete(self.plugin.id, dao_factory.oauth2_credentials)
     end
   }
 }
