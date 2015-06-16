@@ -221,7 +221,6 @@ describe("Authentication Plugin", function()
         local access_token 
         for line in matches do
           access_token = line
-          break
         end
         local data = dao_factory.oauth2_tokens:find_by_keys({access_token = access_token})
         assert.are.equal(1, #data)
@@ -348,27 +347,24 @@ describe("Authentication Plugin", function()
     it("should work when a correct access_token is being sent in the querystring", function()
       local token = provision_token()
       local response, status = http_client.post(STUB_GET_URL, { access_token = token.access_token }, {host = "oauth2.com"})
-      local body = cjson.decode(response)
       assert.are.equal(200, status)
     end)
 
     it("should work when a correct access_token is being sent in a form body", function()
       local token = provision_token()
       local response, status = http_client.post(STUB_POST_URL, { access_token = token.access_token }, {host = "oauth2.com"})
-      local body = cjson.decode(response)
       assert.are.equal(200, status)
     end)
 
     it("should work when a correct access_token is being sent in an authorization header (bearer)", function()
       local token = provision_token()
       local response, status = http_client.post(STUB_POST_URL, { }, {host = "oauth2.com", authorization = "bearer "..token.access_token})
-      local body = cjson.decode(response)
       assert.are.equal(200, status)
     end)
 
     it("should work when a correct access_token is being sent in an authorization header (token)", function()
       local token = provision_token()
-      local response, status, headers = http_client.post(STUB_POST_URL, { }, {host = "oauth2.com", authorization = "token "..token.access_token})
+      local response, status = http_client.post(STUB_POST_URL, { }, {host = "oauth2.com", authorization = "token "..token.access_token})
       local body = cjson.decode(response)
       assert.are.equal(200, status)
 
