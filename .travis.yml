@@ -24,3 +24,5 @@ script:
   - "luacheck kong"
 
 after_success: "luacov-coveralls -i kong"
+
+after_script: "cat nginx_tmp/logs/error.log"
