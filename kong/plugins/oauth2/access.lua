@@ -7,6 +7,7 @@ local timestamp = require "kong.tools.timestamp"
 
 local _M = {}
 
+local CONTENT_LENGTH = "content-length"
 local RESPONSE_TYPE = "response_type"
 local STATE = "state"
 local CODE = "code"
@@ -16,6 +17,7 @@ local SCOPE = "scope"
 local CLIENT_ID = "client_id"
 local CLIENT_SECRET = "client_secret"
 local REDIRECT_URI = "redirect_uri"
+local ACCESS_TOKEN = "access_token"
 local GRANT_TYPE = "grant_type"
 local GRANT_AUTHORIZATION_CODE = "authorization_code"
 local GRANT_REFRESH_TOKEN = "refresh_token"
@@ -23,8 +25,8 @@ local ERROR = "error"
 local AUTHENTICATED_USERNAME = "authenticated_username"
 local AUTHENTICATED_USERID = "authenticated_userid"
 
-local AUTHORIZE_URL = "^/oauth2/authorize/?$"
-local TOKEN_URL = "^/oauth2/token/?$"
+local AUTHORIZE_URL = "^%s/oauth2/authorize/?$"
+local TOKEN_URL = "^%s/oauth2/token/?$"
 
 -- TODO: Expire token (using TTL ?)
 local function generate_token(conf, credential, authenticated_username, authenticated_userid, scope, state)
@@ -35,6 +37,11 @@ local function generate_token(conf, credential, authenticated_username, authenti
     expires_in = conf.token_expiration,
     scope = scope
   })
+
+  if err then
+    return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
+  end
+
   return {
     access_token = token.access_token,
     token_type = "bearer",
@@ -80,7 +87,7 @@ local function authorize(conf)
   else
     local response_type = parameters[RESPONSE_TYPE]
     -- Check response_type
-    if not (response_type == CODE or response_type == TOKEN) then -- Authorization Code Grant (http://tools.ietf.org/html/rfc6749#section-4.1.1)
+    if not (response_type == CODE or (conf.enable_implicit_grant and response_type == TOKEN)) then -- Authorization Code Grant (http://tools.ietf.org/html/rfc6749#section-4.1.1)
       response_params = {[ERROR] = "unsupported_response_type", error_description = "Invalid "..RESPONSE_TYPE}
     end
 
@@ -116,6 +123,10 @@ local function authorize(conf)
           authenticated_userid = parameters[AUTHENTICATED_USERID],
           scope = table.concat(scopes, " ")
         })
+
+        if err then
+          return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
+        end
 
         response_params = {
           code = authorization_code.code,
@@ -216,7 +227,8 @@ local function retrieve_token(access_token)
   return token
 end
 
-local function parse_access_token()
+local function parse_access_token(conf)
+  local found_in = {}
   local result = retrieve_parameters()["access_token"]
   if not result then
     local authorization = ngx.req.get_headers()["authorization"]
@@ -227,23 +239,51 @@ local function parse_access_token()
       end
       if #parts == 2 and (parts[1]:lower() == "token" or parts[1]:lower() == "bearer") then
         result = parts[2]
+        found_in.authorization_header = true
+      end
+    end
+  else
+
+  end
+
+  if conf.hide_credentials then
+    if found_in.authorization_header then
+      ngx.req.clear_header("authorization")
+    else
+      -- Remove from querystring
+      local parameters = ngx.req.get_uri_args()
+      parameters[ACCESS_TOKEN] = nil
+      ngx.req.set_uri_args(parameters)
+
+      if ngx.req.get_method() ~= "GET" then -- Remove from body
+        ngx.req.read_body()
+        parameters = ngx.req.get_post_args()
+        parameters[ACCESS_TOKEN] = nil
+        local encoded_args = ngx.encode_args(parameters)
+        ngx.req.set_header(CONTENT_LENGTH, string.len(encoded_args))
+        ngx.req.set_body_data(encoded_args)
       end
     end
   end
+
   return result
 end
 
 function _M.execute(conf)
+  local path_prefix = ngx.ctx.api.path or ""
+  if stringy.endswith(path_prefix, "/") then
+    path_prefix = path_prefix:sub(1, path_prefix:len() - 1) 
+  end
+
   if ngx.req.get_method() == "POST" then
-    --TODO: strip path resolver from ngx.var.request_uri
-    if ngx.re.match(ngx.var.request_uri, AUTHORIZE_URL) then
+    if ngx.re.match(ngx.var.request_uri, string.format(AUTHORIZE_URL, path_prefix)) then
       authorize(conf)
-    elseif ngx.re.match(ngx.var.request_uri, TOKEN_URL) then
+    elseif ngx.re.match(ngx.var.request_uri, string.format(TOKEN_URL, path_prefix)) then
       issue_token(conf)
     end
   end
 
-  local token = retrieve_token(parse_access_token())
+  local token = retrieve_token(parse_access_token(conf))
   if not token then
     ngx.ctx.stop_phases = true -- interrupt other phases of this request
     return responses.send_HTTP_FORBIDDEN("Invalid authentication credentials")

@@ -10,6 +10,7 @@ describe("OAuth2 Entities Schemas", function()
     it("should not require a `scopes` when `mandatory_scope` is false", function()
       local valid, errors = validate({ mandatory_scope = false }, oauth2_schema)
       assert.truthy(valid)
+      assert.falsy(errors)
     end)
 
     it("should require a `scopes` when `mandatory_scope` is true", function()
