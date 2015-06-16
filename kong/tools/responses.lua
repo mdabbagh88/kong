@@ -4,6 +4,8 @@
 --
 -- @author thibaultcha
 
+local inspect = require "inspect"
+
 -- Define the most used HTTP status codes through Kong
 local _M = {
   status_codes = {
@@ -29,7 +31,7 @@ local response_default_content = {
     return nil
   end,
   [_M.status_codes.HTTP_INTERNAL_SERVER_ERROR] = function(content)
-    ngx.log(ngx.ERR, content)
+    ngx.log(ngx.ERR, inspect(content))
     return "An unexpected error occurred"
   end
 }
