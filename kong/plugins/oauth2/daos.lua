@@ -122,7 +122,7 @@ function OAuth2Tokens:new(properties)
     token_type = { type = "string", required = true, enum = { BEARER }, default = BEARER },
     access_token = { type = "string", required = false, unique = true, queryable = true, immutable = true, func = generate_if_missing },
     refresh_token = { type = "string", required = false, unique = true, queryable = true, immutable = true, func = generate_if_missing },
-    expires_in = { type = "number", require = true },
+    expires_in = { type = "number", required = true },
     authenticated_username = { type = "string", required = false },
     authenticated_userid = { type = "string", required = false },
     scope = { type = "string" },

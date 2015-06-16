@@ -18,5 +18,6 @@ end
 return {
   scopes = { required = false, type = "array" },
   mandatory_scope = { required = true, type = "boolean", default = false, func = check_mandatory_scope },
-  provision_key = { required = false, unique = true, type = "string", func = generate_if_missing }
+  provision_key = { required = false, unique = true, type = "string", func = generate_if_missing },
+  token_expiration = { required = true, type = "number", default = 7200 }
 }
