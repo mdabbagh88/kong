@@ -9,27 +9,6 @@ function Apis:new(properties)
   self._table = "apis"
   self._schema = apis_schema
   self._primary_key = {"id"}
-  self._queries = {}
-  -- __unique = {
-  --     self = {
-  --       args_keys = { "id" },
-  --       query = [[ SELECT * FROM apis WHERE id = ?; ]]
-  --     },
-  --     name = {
-  --       args_keys = { "name" },
-  --       query = [[ SELECT id FROM apis WHERE name = ?; ]]
-  --     },
-  --     path = {
-  --       args_keys = { "path" },
-  --       query = [[ SELECT id FROM apis WHERE path = ?; ]]
-  --     },
-  --     public_dns = {
-  --       args_keys = { "public_dns" },
-  --       query = [[ SELECT id FROM apis WHERE public_dns = ?; ]]
-  --     }
-  --   }
-  -- }
-
   Apis.super.new(self, properties)
 end
 

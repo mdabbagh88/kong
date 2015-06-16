@@ -9,22 +9,6 @@ function Consumers:new(properties)
   self._table = "consumers"
   self._schema = consumers_schema
   self._primary_key = {"id"}
-  self._queries = {
-    __unique = {
-      self = {
-        args_keys = { "id" },
-        query = [[ SELECT * FROM consumers WHERE id = ?; ]]
-      },
-      custom_id = {
-        args_keys = { "custom_id" },
-        query = [[ SELECT id FROM consumers WHERE custom_id = ?; ]]
-      },
-      username = {
-        args_keys = { "username" },
-        query = [[ SELECT id FROM consumers WHERE username = ?; ]]
-      }
-    }
-  }
 
   Consumers.super.new(self, properties)
 end

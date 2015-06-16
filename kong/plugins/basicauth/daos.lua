@@ -1,11 +1,13 @@
 local BaseDao = require "kong.dao.cassandra.base_dao"
 
 local SCHEMA = {
-  id = { type = "id", dao_insert_value = true },
-  created_at = { type = "timestamp", dao_insert_value = true },
-  consumer_id = { type = "id", required = true, foreign = true, queryable = true },
-  username = { type = "string", required = true, unique = true, queryable = true },
-  password = { type = "string" }
+  fields = {
+    id = { type = "id", dao_insert_value = true },
+    created_at = { type = "timestamp", dao_insert_value = true },
+    consumer_id = { type = "id", required = true, foreign = "consumers:id", queryable = true },
+    username = { type = "string", required = true, unique = true, queryable = true },
+    password = { type = "string" }
+  }
 }
 
 local BasicAuthCredentials = BaseDao:extend()

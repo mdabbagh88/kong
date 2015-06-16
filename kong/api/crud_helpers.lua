@@ -11,7 +11,7 @@ function _M.find_api_by_name_or_id(self, dao_factory, helpers)
   }
   self.params.name_or_id = nil
 
-  -- TODO: make the base_dao more flexible so we can query find_one with key/values
+  -- TODO: make the base_dao more flexible so we can query find_by_primary_key with key/values
   -- https://github.com/Mashape/kong/issues/103
   local data, err = dao_factory.apis:find_by_keys(fetch_keys)
   if err then
@@ -76,7 +76,7 @@ end
 function _M.put(params, dao_collection)
   local res, new_entity, err
 
-  res, err = dao_collection:find_one(params)
+  res, err = dao_collection:find_by_primary_key(params)
   if err then
     return app_helpers.yield_error(err)
   end

@@ -12,12 +12,6 @@ function PluginsConfigurations:new(properties)
   self._schema = plugins_configurations_schema
   self._primary_key = {"id", "name"}
   self._queries = {
-    __unique = {
-      self = {
-        args_keys = { "api_id", "consumer_id", "name" },
-        query = [[ SELECT * FROM plugins_configurations WHERE api_id = ? AND consumer_id = ? AND name = ? ALLOW FILTERING; ]]
-      }
-    },
     __foreign = {
       api_id = {
         args_keys = { "api_id" },
