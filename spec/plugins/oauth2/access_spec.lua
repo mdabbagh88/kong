@@ -17,9 +17,10 @@ local STUB_POST_URL = spec_helper.STUB_POST_URL
 local function provision_code()
   local response = http_client.post(PROXY_URL.."/oauth2/authorize", { provision_key = "provision123", client_id = "clientid123", scope = "email", response_type = "code", state = "hello", authenticated_username = "user123", authenticated_userid = "userid123" }, {host = "oauth2.com"})
   local body = cjson.decode(response)
+  print(response)
   local matches = rex.gmatch(body.redirect_uri, "^http://google\\.com/kong\\?code=([\\w]{32,32})&state=hello$")
   local code
-  for line in matches do 
+  for line in matches do
     code = line
   end
   local data = dao_factory.oauth2_authorization_codes:find_by_keys({code = code})
