@@ -5,7 +5,7 @@ DEV_ROCKS=busted luacov luacov-coveralls luacheck
 .PHONY: install dev clean start seed drop lint test coverage test-all
 
 install:
-	@if [ `uname` == "Darwin" ]; then \
+	@if [ `uname` = "Darwin" ]; then \
 		luarocks make kong-*.rockspec; \
 	else \
 		luarocks make kong-*.rockspec \
@@ -45,7 +45,7 @@ drop:
 	@bin/kong db -c $(DEVELOPMENT_CONF) drop
 
 lint:
-	@luacheck kong
+	@find kong spec -name '*.lua' ! -name 'invalid-module.lua' | xargs luacheck -q
 
 test:
 	@busted spec/unit
