@@ -125,6 +125,8 @@ local function authorize(conf)
         })
 
         if err then
+          print("HERE")
+          print(tostring(err))
           return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
         end
 
