@@ -1,7 +1,12 @@
 local uuid = require "uuid"
 
 -- This is important to seed the UUID generator
-uuid.seed()
+math.randomseed(1234)
+if package.loaded["socket"] and package.loaded["socket"].gettime then
+  uuid.randomseed(package.loaded["socket"].gettime()*10000+math.random())
+else
+  uuid.randomseed(os.time()+math.random())
+end
 
 local _M = {}
 
